@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Home, Volume2, X } from "lucide-react";
+import { ArrowLeft, Volume2, X } from "lucide-react";
 import { api } from "../../api/client";
 import { useApp } from "../../state/AppContext";
 import { speak } from "../../lib/tts";
@@ -211,17 +211,6 @@ export function ResultPage() {
         </section>
       )}
 
-      <div className="flex flex-wrap gap-3 pt-2">
-        <Link to={`/study/new?mode=${r.mode}&set=${r.session_id ? "" : ""}`} className="hidden" aria-hidden />
-        {r.set_id && (
-          <Link to={`/sets/${r.set_id}`} className="btn btn-primary min-h-[3rem] px-7 text-base font-bold rounded-xl flex items-center gap-2">
-            <ArrowLeft size={18} aria-hidden /> {t("exit_to_set")}
-          </Link>
-        )}
-        <Link to="/" className="btn btn-secondary min-h-[3rem] px-7 text-base font-bold rounded-xl flex items-center gap-2">
-          <Home size={18} aria-hidden /> {t("nav_home")}
-        </Link>
-      </div>
       <p className="text-sm text-[var(--text-muted)]">
         {t("learned_note")}
       </p>
