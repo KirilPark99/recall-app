@@ -324,20 +324,20 @@ class TestQuizletApiEndpoints:
 
     async def test_quizlet_folder_url_detection(self):
         from app.services.quizlet_service import is_quizlet_folder_url, is_quizlet_url
-        assert is_quizlet_folder_url("https://quizlet.com/join/7UmsRChtM?i=1c538u&x=1bqt") is True
+        assert is_quizlet_folder_url("https://quizlet.com/join/TESTCODE") is True
         assert is_quizlet_folder_url("https://quizlet.com/class/31816981/") is True
         assert is_quizlet_folder_url("https://quizlet.com/example_user/folders/sample-folder") is True
         assert is_quizlet_folder_url("https://quizlet.com/folders/31816981") is True
-        assert is_quizlet_folder_url("https://quizlet.com/814143431/flash-cards/") is False
-        assert is_quizlet_folder_url("https://quizlet.com/814143431/") is False
-        assert is_quizlet_url("https://quizlet.com/join/7UmsRChtM?i=1c538u&x=1bqt") is True
+        assert is_quizlet_folder_url("https://quizlet.com/000000000/flash-cards/") is False
+        assert is_quizlet_folder_url("https://quizlet.com/000000000/") is False
+        assert is_quizlet_url("https://quizlet.com/join/TESTCODE") is True
 
     async def test_quizlet_folder_import_endpoint(self, alice, monkeypatch):
         from unittest.mock import AsyncMock
         import app.api.imports_api as imp_api
 
         mock_folder_data = {
-            "folder_title": "Speaking Honey Class",
+            "folder_title": "Example Quizlet Class",
             "total_sets": 2,
             "imported_sets": [
                 {
@@ -367,13 +367,13 @@ class TestQuizletApiEndpoints:
         )
 
         res = await alice.post("/imports/quizlet/folder/import", json={
-            "url": "https://quizlet.com/join/7UmsRChtM?i=1c538u&x=1bqt",
-            "folder_name": "Speaking Honey Class",
+            "url": "https://quizlet.com/join/TESTCODE",
+            "folder_name": "Example Quizlet Class",
         })
         assert res.status_code == 200
         data = res.json()
         assert data["ok"] is True
-        assert data["folder_name"] == "Speaking Honey Class"
+        assert data["folder_name"] == "Example Quizlet Class"
         assert data["imported_sets_count"] == 2
         assert data["total_cards_count"] == 4
         folder_id = data["folder_id"]
@@ -385,7 +385,7 @@ class TestQuizletApiEndpoints:
         folders = folders_res.json()
         target_folder = next((f for f in folders if f["id"] == folder_id), None)
         assert target_folder is not None
-        assert target_folder["name"] == "Speaking Honey Class"
+        assert target_folder["name"] == "Example Quizlet Class"
         assert target_folder["set_count"] == 2
 
 

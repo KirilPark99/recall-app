@@ -126,7 +126,7 @@ export function QuizletImportModal({ onClose, onAddCards }: QuizletImportModalPr
               Импорт по ссылке или тексту из Quizlet:
             </span>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Вставьте <strong>ссылку на любой набор Quizlet</strong> (например, <code className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[var(--text-main)] font-mono">https://quizlet.com/814143431/...</code>) или скопированный текст карточек. Recall автоматически загрузит набор, обойдя защиту Cloudflare через EzSolver.
+              Вставьте <strong>ссылку на любой набор Quizlet</strong> (например, <code className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[var(--text-main)] font-mono">https://quizlet.com/000000000/...</code>) или скопированный текст карточек. Recall автоматически загрузит набор, обойдя защиту Cloudflare через EzSolver.
             </p>
           </div>
         </div>
@@ -151,7 +151,7 @@ export function QuizletImportModal({ onClose, onAddCards }: QuizletImportModalPr
                 className="textarea font-mono text-sm sm:text-base rounded-2xl p-4 leading-relaxed w-full min-h-[11rem]"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={"https://quizlet.com/814143431/flash-cards/\n\nили вставьте текст карточек:\napple\tяблоко\ndog\tсобака"}
+                placeholder={"https://quizlet.com/000000000/flash-cards/\n\nили вставьте текст карточек:\napple\tяблоко\ndog\tсобака"}
                 autoFocus
               />
             </div>

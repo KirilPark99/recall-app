@@ -5,13 +5,28 @@
 
 # --- Environment & Credentials ---
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.env
 *.pem
 *.key
 *.cert
 *.crt
+.npmrc
+.pypirc
+.netrc
+pip.conf
+credentials.json
+service-account.json
+secrets.yaml
+secrets.yml
+id_rsa
+id_ed25519
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.tsbuildinfo
 
 # --- Application Data & SQLite Databases ---
 data/
