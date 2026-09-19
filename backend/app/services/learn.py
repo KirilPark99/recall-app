@@ -18,11 +18,13 @@ def init_state(session, pool: list[PoolEntry]) -> None:
     state["learn"] = {
         "batches": batches,
         "batch_index": 0,
+        "batch_phase": "choice",
         "queue": [],
         "card": {},
         "mastered": [],
         "round_failed": [],
         "hints_used": 0,
+        "repeat_batch": None,
     }
     session.state_json = json.dumps(state, ensure_ascii=False)
 
@@ -39,7 +41,14 @@ def _save(session, ls: dict) -> None:
 
 def _card_state(ls: dict, key: str) -> dict:
     return ls["card"].setdefault(
-        key, {"successes": 0, "written_success": False, "presentations": 0, "types_done": [], "revealed": False}
+        key, {
+            "successes": 0,
+            "written_success": False,
+            "recognition_success": False,
+            "presentations": 0,
+            "types_done": [],
+            "revealed": False,
+        }
     )
 
 
@@ -67,7 +76,9 @@ def on_answer(session, item, entry, feedback: dict, assisted: bool) -> dict:
     if assisted and feedback.get("answer_type") != "self_assess":
         feedback["assisted"] = True
     correct = bool(feedback.get("correct"))
-    written_available = _written_available(session_pool_by_key(session), key)
+    pool_dict = session_pool_by_key(session)
+    written_available = _written_available(pool_dict, key)
+    rec_possible = _recognition_possible(pool_dict, key, list(pool_dict.values()))
 
     if item.task_type == "written":
         cs["types_done"] = sorted(set(cs["types_done"]) | {"written"})
@@ -78,20 +89,33 @@ def on_answer(session, item, entry, feedback: dict, assisted: bool) -> dict:
         cs["successes"] += 1
         if item.task_type == "written":
             cs["written_success"] = True
-        independent_ok = cs["successes"] >= 2 and (cs["written_success"] or not written_available)
-        if cs["successes"] >= 2 and not written_available and cs["types_done"].count("recognition") >= 2:
+        if item.task_type == "recognition":
+            cs["recognition_success"] = True
+
+        independent_ok = False
+        if cs["written_success"] and (cs["recognition_success"] or not rec_possible or cs["successes"] >= 2):
             independent_ok = True
+        elif not written_available and cs["successes"] >= 2:
+            independent_ok = True
+        elif not rec_possible and (cs["written_success"] or cs["successes"] >= 1):
+            independent_ok = True
+
         if independent_ok:
             _mark_mastered(ls, key)
             _save(session, ls)
             return {"mastered": True}
+        else:
+            # Успех на этапе выбора — убираем карточку из текущей очереди фазы выбора,
+            # чтобы перейти к следующим карточкам порции
+            if key in ls["queue"]:
+                ls["queue"].remove(key)
     elif not correct:
-        # Возврат карточки позже в этой порции.
+        # Ошибка: возврат карточки в конец очереди текущей фазы
         if key in ls["queue"]:
             ls["queue"].remove(key)
         ls["queue"].append(key)
     else:
-        # Успех с подсказкой/раскрытием: не самостоятельный, требуется ещё попытка.
+        # Успех с подсказкой/раскрытием: не самостоятельный, требуется ещё попытка
         if key in ls["queue"]:
             ls["queue"].remove(key)
         ls["queue"].append(key)
@@ -101,6 +125,7 @@ def on_answer(session, item, entry, feedback: dict, assisted: bool) -> dict:
             ls["queue"].remove(key)
         if key not in ls["round_failed"]:
             ls["round_failed"].append(key)
+
     _save(session, ls)
     return {"mastered": key in ls["mastered"], "round_failed": key in ls["round_failed"]}
 
@@ -119,50 +144,109 @@ def _mark_mastered(ls: dict, key: str) -> None:
 
 
 def next_task(session, pool_by_key: dict[str, PoolEntry], pool: list[PoolEntry]):
-    """Возвращает (key, task_type) следующего задания или ('', round_complete)."""
+    """Возвращает (key, task_type) следующего задания или (None, status)."""
     ls = _lstate(session)
-    if ls["batch_index"] >= len(ls["batches"]) and not ls["queue"]:
-        return None, "pool_complete"
-    if not ls["queue"]:
-        if ls["batch_index"] < len(ls["batches"]):
-            batch = ls["batches"][ls["batch_index"]]
-            ls["batch_index"] += 1
-            ls["queue"] = [k for k in batch if k not in ls["mastered"] and k not in ls["round_failed"]]
-    while ls["queue"]:
-        key = ls["queue"][0]
-        cs = _card_state(ls, key)
-        if cs["presentations"] >= MAX_PRESENTATIONS_PER_ROUND:
-            ls["queue"].pop(0)
-            if key not in ls["round_failed"]:
-                ls["round_failed"].append(key)
-            continue
-        if key not in pool_by_key:
-            # Карточка удалена: пропускаем с пересчётом объёма.
-            ls["queue"].pop(0)
-            continue
-        task_type = _pick_task_type(ls, key, pool_by_key, pool)
-        if task_type is None:
-            ls["queue"].pop(0)
-            continue
-        _save(session, ls)
-        return key, task_type
-    _save(session, ls)
-    return None, "round_complete"
+
+    while True:
+        # 1. Если текущая очередь пуста:
+        if not ls["queue"]:
+            phase = ls.get("batch_phase", "choice")
+            if ls["batch_index"] == 0 and not ls.get("repeat_batch"):
+                # Начинаем первую порцию
+                batch = ls["batches"][0]
+                ls["batch_index"] = 1
+                ls["batch_phase"] = "choice"
+                ls["queue"] = [
+                    k for k in batch
+                    if k not in ls["mastered"] and k not in ls["round_failed"]
+                ]
+            elif phase == "choice":
+                # Завершена фаза выбора (recognition) текущей порции!
+                # Переходим к фазе написания (written) для этой же порции
+                current_batch = ls.get("repeat_batch") or ls["batches"][ls["batch_index"] - 1]
+                written_candidates = [
+                    k for k in current_batch
+                    if k not in ls["mastered"] and k not in ls["round_failed"]
+                ]
+                if written_candidates:
+                    ls["batch_phase"] = "written"
+                    ls["queue"] = written_candidates
+                else:
+                    ls["batch_phase"] = "round_done"
+                    if ls.get("repeat_batch"):
+                        ls["repeat_batch"] = None
+                    _save(session, ls)
+                    if ls["batch_index"] >= len(ls["batches"]):
+                        return None, "pool_complete"
+                    return None, "round_complete"
+            elif phase == "written":
+                # Завершена фаза написания текущей порции!
+                ls["batch_phase"] = "round_done"
+                if ls.get("repeat_batch"):
+                    ls["repeat_batch"] = None
+                _save(session, ls)
+                if ls["batch_index"] >= len(ls["batches"]):
+                    return None, "pool_complete"
+                return None, "round_complete"
+            elif phase == "round_done":
+                # Пользователь перешел к следующей порции (next_batch)
+                if ls.get("repeat_batch"):
+                    ls["repeat_batch"] = None
+                if ls["batch_index"] < len(ls["batches"]):
+                    batch = ls["batches"][ls["batch_index"]]
+                    ls["batch_index"] += 1
+                    ls["batch_phase"] = "choice"
+                    ls["queue"] = [
+                        k for k in batch
+                        if k not in ls["mastered"] and k not in ls["round_failed"]
+                    ]
+                else:
+                    _save(session, ls)
+                    return None, "pool_complete"
+
+        # 2. Выбираем следующую карточку из очереди
+        while ls["queue"]:
+            key = ls["queue"][0]
+            cs = _card_state(ls, key)
+            if cs["presentations"] >= MAX_PRESENTATIONS_PER_ROUND:
+                ls["queue"].pop(0)
+                if key not in ls["round_failed"]:
+                    ls["round_failed"].append(key)
+                continue
+            if key not in pool_by_key:
+                # Карточка удалена: пропускаем
+                ls["queue"].pop(0)
+                continue
+            task_type = _pick_task_type(ls, key, pool_by_key, pool)
+            if task_type is None:
+                ls["queue"].pop(0)
+                continue
+            _save(session, ls)
+            return key, task_type
 
 
 def _pick_task_type(ls: dict, key: str, pool_by_key: dict, pool: list[PoolEntry]) -> str | None:
     cs = _card_state(ls, key)
     written_ok = _written_available(pool_by_key, key)
     recognition_ok = _recognition_possible(pool_by_key, key, pool)
-    done = cs["types_done"]
-    # Сначала распознавание, затем письменное воспроизведение (спецификация Learn).
-    if recognition_ok and "recognition" not in done:
-        return "recognition"
-    if written_ok:
-        return "written"
-    if recognition_ok:
-        return "recognition"
-    return "self_assess"
+    phase = ls.get("batch_phase", "choice")
+
+    if phase == "choice":
+        if recognition_ok and not cs.get("recognition_success"):
+            return "recognition"
+        if written_ok:
+            return "written"
+        if recognition_ok:
+            return "recognition"
+        return "self_assess"
+    else:  # "written"
+        if written_ok and not cs.get("written_success"):
+            return "written"
+        if recognition_ok:
+            return "recognition"
+        if written_ok:
+            return "written"
+        return "self_assess"
 
 
 def round_summary(session) -> dict:
@@ -181,12 +265,18 @@ def round_summary(session) -> dict:
 def start_repeat_failed_round(session) -> dict:
     """«Повторить ошибки»: неудачные карточки снова в очереди той же порции."""
     ls = _lstate(session)
-    failed = ls["round_failed"]
-    ls["queue"] = list(failed)
+    failed = list(ls["round_failed"])
     ls["round_failed"] = []
+    ls["repeat_batch"] = list(failed)
+    ls["batch_phase"] = "choice"
+    ls["queue"] = list(failed)
     for key in failed:
         cs = _card_state(ls, key)
         cs["presentations"] = 0
+        cs["written_success"] = False
+        cs["recognition_success"] = False
+        cs["successes"] = 0
+        cs["types_done"] = []
     _save(session, ls)
     return {"requeued": failed}
 

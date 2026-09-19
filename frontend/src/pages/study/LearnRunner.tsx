@@ -309,23 +309,41 @@ export function LearnRunner({ sessionId }: { sessionId: string }) {
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             {roundComplete.round_failed.length > 0 ? (
-              <button
-                type="button"
-                className="btn btn-primary min-h-[3.25rem] px-8 text-base font-bold rounded-xl"
-                onClick={() => void repeatFailed()}
-                disabled={loading}
-              >
-                {loading ? "Загрузка..." : `${t("repeat_mistakes")} (${roundComplete.round_failed.length})`}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary min-h-[3.25rem] px-8 text-base font-bold rounded-xl"
+                  onClick={() => void repeatFailed()}
+                  disabled={loading}
+                >
+                  {loading ? "Загрузка..." : `${t("repeat_mistakes")} (${roundComplete.round_failed.length})`}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost min-h-[3.25rem] px-6 text-base font-medium rounded-xl"
+                  onClick={() => void finish()}
+                >
+                  {t("finish")}
+                </button>
+              </>
             ) : !poolDone && roundComplete.batch_index < roundComplete.total_batches ? (
-              <button
-                type="button"
-                className="btn btn-primary min-h-[3.25rem] px-8 text-base font-bold rounded-xl"
-                onClick={() => void nextBatch()}
-                disabled={loading}
-              >
-                {loading ? "Загрузка..." : t("next_batch")}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary min-h-[3.25rem] px-8 text-base font-bold rounded-xl"
+                  onClick={() => void nextBatch()}
+                  disabled={loading}
+                >
+                  {loading ? "Загрузка..." : t("next_batch")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost min-h-[3.25rem] px-6 text-base font-medium rounded-xl"
+                  onClick={() => void finish()}
+                >
+                  {t("finish")}
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -336,13 +354,6 @@ export function LearnRunner({ sessionId }: { sessionId: string }) {
                 {t("finish")}
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-ghost min-h-[3.25rem] px-6 text-base font-medium rounded-xl"
-              onClick={() => void finish()}
-            >
-              {t("finish")}
-            </button>
           </div>
           <p className="max-w-sm text-sm text-[var(--text-muted)]">
             {t("learned_note")}
@@ -685,5 +696,5 @@ function FeedbackBlock({ feedback }: { feedback: Feedback }) {
 }
 
 function taskLabel(type: string): string {
-  return { recognition: "MC", written: "Written", self_assess: "Self" }[type] ?? type;
+  return { recognition: "Выбор ответа", written: "Написание", self_assess: "Самооценка" }[type] ?? type;
 }

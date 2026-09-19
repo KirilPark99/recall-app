@@ -118,8 +118,61 @@ def test_deleted_card_skipped_in_queue():
     assert key == "c1:front_to_back"
 
 
+def test_full_batch_recognition_then_written():
+    session, pool, by_key = make(None, n=3, settings_json=json.dumps({"batch_size": 3}))
+
+    # Phase 1: All cards must be served as recognition first
+    # Card 0
+    k0, t0 = learn.next_task(session, by_key, pool)
+    assert t0 == "recognition"
+    item0 = SimpleItem("c0", "front_to_back", t0)
+    res0 = learn.on_answer(session, item0, by_key[k0], {"correct": True}, assisted=False)
+    assert not res0["mastered"]
+
+    # Card 1 - error on first try
+    k1, t1 = learn.next_task(session, by_key, pool)
+    assert t1 == "recognition"
+    assert k1 == "c1:front_to_back"
+    item1 = SimpleItem("c1", "front_to_back", t1)
+    res1 = learn.on_answer(session, item1, by_key[k1], {"correct": False}, assisted=False)
+    assert not res1["mastered"]
+
+    # Card 2
+    k2, t2 = learn.next_task(session, by_key, pool)
+    assert t2 == "recognition"
+    assert k2 == "c2:front_to_back"
+    item2 = SimpleItem("c2", "front_to_back", t2)
+    res2 = learn.on_answer(session, item2, by_key[k2], {"correct": True}, assisted=False)
+    assert not res2["mastered"]
+
+    # Card 1 again (since it had an error) - must still be recognition!
+    k1_retry, t1_retry = learn.next_task(session, by_key, pool)
+    assert k1_retry == "c1:front_to_back"
+    assert t1_retry == "recognition"
+    res1_retry = learn.on_answer(session, item1, by_key[k1_retry], {"correct": True}, assisted=False)
+    assert not res1_retry["mastered"]
+
+    # All 3 cards completed recognition phase. Next tasks must be written!
+    written_cards = []
+    for _ in range(3):
+        kw, tw = learn.next_task(session, by_key, pool)
+        assert tw == "written"
+        written_cards.append(kw)
+        item_w = SimpleItem(kw.split(":")[0], "front_to_back", tw)
+        res_w = learn.on_answer(session, item_w, by_key[kw], {"correct": True}, assisted=False)
+        assert res_w["mastered"]
+
+    assert set(written_cards) == {"c0:front_to_back", "c1:front_to_back", "c2:front_to_back"}
+
+    # Now all cards mastered in this batch, next_task returns completion
+    k_end, status = learn.next_task(session, by_key, pool)
+    assert k_end is None
+    assert status in ("round_complete", "pool_complete")
+
+
 class SimpleItem:
     def __init__(self, card_id: str, direction: str, task_type: str):
         self.card_id = card_id
         self.direction = direction
         self.task_type = task_type
+
