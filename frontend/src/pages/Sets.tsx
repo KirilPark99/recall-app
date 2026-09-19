@@ -81,15 +81,24 @@ export function SetsPage() {
 
   // Определение активной вкладки папки
   const folderParam = params.get("folder");
-  const activeFolderId =
-    folderParam !== null
-      ? folderParam
-      : (folders.data?.[0]?.id ?? "all");
+  let activeFolderId = folderParam || "all";
+  if (
+    folders.data &&
+    activeFolderId !== "all" &&
+    activeFolderId !== "unassigned" &&
+    !folders.data.some((f) => f.id === activeFolderId)
+  ) {
+    activeFolderId = "all";
+  }
 
   const selectFolder = (fid: string) => {
     setParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.set("folder", fid);
+      if (fid === "all") {
+        next.delete("folder");
+      } else {
+        next.set("folder", fid);
+      }
       return next;
     });
   };
@@ -287,6 +296,69 @@ export function SetsPage() {
               isDragging ? "cursor-grabbing" : "cursor-grab"
             }`}
           >
+            {/* Вкладка «Все наборы» */}
+            <button
+              type="button"
+              onClick={(e) => {
+                if (hasMovedRef.current) {
+                  e.preventDefault();
+                  return;
+                }
+                selectFolder("all");
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all cursor-pointer shrink-0 ${
+                activeFolderId === "all"
+                  ? "bg-[var(--accent)] text-white font-bold shadow-md"
+                  : "bg-[var(--surface-2)] text-[var(--text-muted)] hover:bg-[var(--surface-1)] hover:text-[var(--text-main)] font-semibold border border-transparent hover:border-[var(--border)]"
+              }`}
+              aria-pressed={activeFolderId === "all"}
+            >
+              <Layers size={16} />
+              <span>Все наборы</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${
+                  activeFolderId === "all"
+                    ? "bg-white/25 text-white"
+                    : "bg-[var(--surface-1)] text-[var(--text-muted)]"
+                }`}
+              >
+                {totalCount}
+              </span>
+            </button>
+
+            {/* Вкладка «Без папки» */}
+            {unassignedCount > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  if (hasMovedRef.current) {
+                    e.preventDefault();
+                    return;
+                  }
+                  selectFolder("unassigned");
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all cursor-pointer shrink-0 ${
+                  activeFolderId === "unassigned"
+                    ? "bg-[var(--accent)] text-white font-bold shadow-md"
+                    : "bg-[var(--surface-2)] text-[var(--text-muted)] hover:bg-[var(--surface-1)] hover:text-[var(--text-main)] font-semibold border border-transparent hover:border-[var(--border)]"
+                }`}
+                aria-pressed={activeFolderId === "unassigned"}
+              >
+                <FileText size={16} />
+                <span>Без папки</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${
+                    activeFolderId === "unassigned"
+                      ? "bg-white/25 text-white"
+                      : "bg-[var(--surface-1)] text-[var(--text-muted)]"
+                  }`}
+                >
+                  {unassignedCount}
+                </span>
+              </button>
+            )}
+
+            {/* Папки пользователя */}
             {folders.data &&
               folders.data.map((f) => {
                 const isActive = activeFolderId === f.id;
@@ -330,68 +402,6 @@ export function SetsPage() {
                   </button>
                 );
               })}
-
-            {/* Вкладка «Без папки» */}
-            {unassignedCount > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  if (hasMovedRef.current) {
-                    e.preventDefault();
-                    return;
-                  }
-                  selectFolder("unassigned");
-                }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all cursor-pointer shrink-0 ${
-                  activeFolderId === "unassigned"
-                    ? "bg-[var(--accent)] text-white font-bold shadow-md"
-                    : "bg-[var(--surface-2)] text-[var(--text-muted)] hover:bg-[var(--surface-1)] hover:text-[var(--text-main)] font-semibold border border-transparent hover:border-[var(--border)]"
-                }`}
-                aria-pressed={activeFolderId === "unassigned"}
-              >
-                <FileText size={16} />
-                <span>Без папки</span>
-                <span
-                  className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${
-                    activeFolderId === "unassigned"
-                      ? "bg-white/25 text-white"
-                      : "bg-[var(--surface-1)] text-[var(--text-muted)]"
-                  }`}
-                >
-                  {unassignedCount}
-                </span>
-              </button>
-            )}
-
-            {/* Вкладка «Все наборы» */}
-            <button
-              type="button"
-              onClick={(e) => {
-                if (hasMovedRef.current) {
-                  e.preventDefault();
-                  return;
-                }
-                selectFolder("all");
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all cursor-pointer shrink-0 ${
-                activeFolderId === "all"
-                  ? "bg-[var(--accent)] text-white font-bold shadow-md"
-                  : "bg-[var(--surface-2)] text-[var(--text-muted)] hover:bg-[var(--surface-1)] hover:text-[var(--text-main)] font-semibold border border-transparent hover:border-[var(--border)]"
-              }`}
-              aria-pressed={activeFolderId === "all"}
-            >
-              <Layers size={16} />
-              <span>Все наборы</span>
-              <span
-                className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${
-                  activeFolderId === "all"
-                    ? "bg-white/25 text-white"
-                    : "bg-[var(--surface-1)] text-[var(--text-muted)]"
-                }`}
-              >
-                {totalCount}
-              </span>
-            </button>
 
             {/* Кнопка создания новой папки */}
             <button
